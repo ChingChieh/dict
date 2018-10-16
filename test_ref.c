@@ -49,8 +49,8 @@ int main(int argc, char **argv)
     bloom_t bloom = bloom_create(TableSize);
 
     /* memory pool */
-    char *pool = (char *) malloc(poolsize * sizeof(char));
-    char *Top = pool;
+    char *pool = (char *) malloc(poolsize * sizeof(char));  // pool for what??
+    char *Top = pool;  // top is for recording top of the pool
     while ((rtn = fscanf(fp, "%s", Top)) != EOF) {
         char *p = Top;
         /* insert reference to each string */
@@ -67,6 +67,13 @@ int main(int argc, char **argv)
     t2 = tvgetf();
     fclose(fp);
     printf("ternary_tree, loaded %d words in %.6f sec\n", idx, t2 - t1);
+    puts(pool);
+    if (argc == 2 && strcmp(argv[1], "--bench") == 0) {
+        int stat = bench_test(root, BENCH_TEST_FILE, LMAX);
+        tst_free(root);
+        return stat;
+    }
+
 
     for (;;) {
         char *p;
