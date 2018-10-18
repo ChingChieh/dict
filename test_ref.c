@@ -67,10 +67,10 @@ int main(int argc, char **argv)
     t2 = tvgetf();
     fclose(fp);
     printf("ternary_tree, loaded %d words in %.6f sec\n", idx, t2 - t1);
-    puts(pool);
     if (argc == 2 && strcmp(argv[1], "--bench") == 0) {
         int stat = bench_test(root, BENCH_TEST_FILE, LMAX);
         tst_free(root);
+        free(pool);
         return stat;
     }
 
@@ -200,6 +200,7 @@ int main(int argc, char **argv)
         quit:
         case 'q':
             tst_free(root);
+            free(pool);
             return 0;
             break;
         default:
