@@ -1,10 +1,16 @@
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
 #include "bench.c"
+#include "bloom.h"
 #include "tst.h"
+
+#define TableSize 5000000 /* size of bloom filter */
+#define HashNumber 2      /* number of hash function */
+
 /** constants insert, delete, max word(s) & stack nodes */
 enum { INS, DEL, WRDMAX = 256, STKMAX = 512, LMAX = 1024 };
 #define REF INS
@@ -39,12 +45,17 @@ int main(int argc, char **argv)
     }
 
     t1 = tvgetf();
+
+    bloom_t bloom = bloom_create(TableSize);
+
     while ((rtn = fscanf(fp, "%s", word)) != EOF) {
         char *p = word;
         if (!tst_ins_del(&root, &p, INS, CPY)) {
             fprintf(stderr, "error: memory exhausted, tst_insert.\n");
             fclose(fp);
             return 1;
+        } else {
+            bloom_add(bloom, word);
         }
         idx++;
     }
@@ -94,9 +105,16 @@ int main(int argc, char **argv)
                 break;
             }
             rmcrlf(word);
+
             p = word;
             t1 = tvgetf();
-            res = tst_ins_del(&root, &p, INS, CPY);
+            if (bloom_test(bloom, word) == 1)
+                res = NULL;
+            else {
+                bloom_add(bloom, word);
+                res = tst_ins_del(&root, &p, INS, CPY);
+            }
+            // res = tst_ins_del(&root, &p, INS, CPY);
             t2 = tvgetf();
             if (res) {
                 idx++;
@@ -117,15 +135,29 @@ int main(int argc, char **argv)
             }
             rmcrlf(word);
             t1 = tvgetf();
-            res = tst_search(root, word);
-            t2 = tvgetf();
-            if (res)
-                printf("  found %s in %.6f sec.\n", (char *) res, t2 - t1);
-            else
-                printf("  %s not found.\n", word);
+
+            if (bloom_test(bloom, word) == 1) {
+                t2 = tvgetf();
+                printf("  Bloomfilter found %s in %.6f sec.\n", word, t2 - t1);
+                printf(
+                    "  Probability of false positives:%lf\n",
+                    pow(1 - exp(-(double) HashNumber /
+                                (double) ((double) TableSize / (double) idx)),
+                        HashNumber));
+                t1 = tvgetf();
+                res = tst_search(root, word);
+                t2 = tvgetf();
+                if (res)
+                    printf("  ----------\n  Tree found %s in %.6f sec.\n",
+                           (char *) res, t2 - t1);
+                else
+                    printf("  ----------\n  %s not found by tree.\n", word);
+            } else
+                printf("  %s not found by bloom filter.\n", word);
             break;
         case 's':
             printf("find words matching prefix (at least 1 char): ");
+
             if (argc > 1 && strcmp(argv[1], "--bench") == 0)
                 strcpy(word, argv[3]);
             else if (!fgets(word, sizeof word, stdin)) {
@@ -176,6 +208,6 @@ int main(int argc, char **argv)
             break;
         }
     }
-
+    bloom_free(bloom);
     return 0;
 }
